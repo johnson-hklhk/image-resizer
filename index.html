@@ -1,0 +1,1211 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Image Compressor & Resizer</title>
+<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='5' width='26' height='22' rx='4' fill='%23101010'/><circle cx='11' cy='12' r='2.6' fill='%23ffffff'/><path d='M4 27 L13 16 L17 20 L22 15 L28 22 L28 27 Z' fill='%23ffffff'/></svg>" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kode+Mono:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&family=Libre+Barcode+128+Text&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<style>
+  /* ============================================================
+     Monochrome techno-HUD skin. Tailwind (CDN) stays loaded and
+     still lays out the JS-generated cards; this sheet re-skins
+     everything on top. Class names the JS toggles are preserved:
+     .hidden .opacity-60 .dropzone-active .spinner .toast-anim
+     ============================================================ */
+  :root {
+    --ink: #101010;   --paper: #ffffff;
+    --ink-soft: #5c5c5c;   --paper-alt: #f2f2f2;
+    --ink-faint: #9b9b9b;  --slab: #b5b5b5;   --slab-soft: #d8d8d8;
+    --line: #101010;
+
+    --shade: rgba(16,16,16,0.22);
+    --drop: 5px 5px 0 var(--shade);
+    --drop-sm: 3px 3px 0 var(--shade);
+    --drop-ink: 5px 5px 0 var(--ink);
+
+    --radius: 4px;   --radius-lg: 10px;   --bw: 2px;
+    --gutter: 20px;
+    --header-h: 40px;  --meta-h: 34px;
+    --header-total: calc(var(--header-h) + var(--meta-h));
+
+    --ease: cubic-bezier(0.22, 1, 0.36, 1);
+
+    --font-display: 'Kode Mono';
+    --font-mono: 'Roboto Mono';
+    --font-barcode: 'Libre Barcode 128 Text';
+  }
+  @media (min-width: 768px) {
+    :root { --gutter: 36px; --header-h: 46px; --meta-h: 38px; }
+  }
+
+  /* --- base ------------------------------------------------- */
+  body {
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-mono), ui-monospace, monospace;
+    font-size: 15px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection { background: var(--ink); color: var(--paper); }
+  :focus-visible { outline: var(--bw) solid var(--ink); outline-offset: 3px; }
+
+  ::-webkit-scrollbar { width: 10px; height: 10px; }
+  ::-webkit-scrollbar-thumb { background: var(--slab); border: 2px solid var(--paper); }
+
+  .hud-note {
+    font-family: var(--font-mono), monospace;
+    font-size: 11px; letter-spacing: 0.08em;
+    text-transform: uppercase; color: var(--ink-faint);
+  }
+
+  /* --- header strip ---------------------------------------- */
+  .hud-header { position: sticky; top: 0; z-index: 50; background: var(--paper); }
+  .hud-header__row { display: flex; align-items: stretch; gap: 10px; height: var(--header-h); }
+  .hud-tab {
+    display: grid; place-items: center;
+    padding: 0 clamp(14px, 2vw, 28px);
+    background: var(--ink); color: var(--paper);
+    font-family: var(--font-display), monospace; font-weight: 600;
+    font-size: clamp(10px, 0.9vw, 13px); letter-spacing: 0.08em;
+    text-transform: uppercase; white-space: nowrap;
+  }
+  .hud-wire { flex: 1; align-self: center; height: var(--bw); background: var(--ink); min-width: 20px; }
+  .hud-bar {
+    display: flex; align-items: center; justify-content: flex-end; gap: 18px;
+    padding: 0 var(--gutter); background: var(--ink); color: var(--paper);
+    font-family: var(--font-mono), monospace; font-size: clamp(10px, 0.9vw, 13px);
+    letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .hud-status { display: inline-flex; align-items: center; gap: 8px; color: var(--slab); }
+  .hud-status::before {
+    content: ''; width: 6px; height: 6px; background: currentColor;
+    animation: hud-blink 1.6s steps(1, end) infinite;
+  }
+  .hud-meta {
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    height: var(--meta-h); padding: 0 var(--gutter);
+    border-top: var(--bw) solid var(--ink); border-bottom: var(--bw) solid var(--ink);
+    background: var(--paper);
+    font-family: var(--font-mono), monospace; font-size: 11px;
+    font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .hud-meta__right { color: var(--ink-faint); }
+  @media (max-width: 767px) {
+    .hud-wire, .hud-bar, .hud-meta__right { display: none; }
+  }
+  @keyframes hud-blink { 0%,55% { opacity: 1; } 56%,100% { opacity: 0.15; } }
+
+  /* --- section head ---------------------------------------- */
+  .hud-section-head {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 12px;
+    padding-bottom: 16px; margin-bottom: 24px;
+    border-bottom: var(--bw) solid var(--ink);
+  }
+  .hud-title {
+    font-family: var(--font-display), monospace; font-weight: 600;
+    font-size: clamp(20px, 2.8vw, 36px); line-height: 1.05;
+    letter-spacing: 0.02em; text-transform: uppercase;
+  }
+
+  /* --- readout marker -------------------------------------- */
+  .readout {
+    display: inline-flex; align-items: center; gap: 8px; width: max-content;
+    padding: 3px 10px; border: var(--bw) solid var(--ink); border-radius: var(--radius);
+    font-family: var(--font-mono), monospace; font-size: 11px;
+    letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap;
+  }
+  .readout--fill { background: var(--ink); color: var(--paper); }
+
+  /* --- frame surface --------------------------------------- */
+  .frame {
+    background: var(--paper); border: var(--bw) solid var(--ink);
+    border-radius: var(--radius-lg); box-shadow: var(--drop);
+  }
+  .hud-hr { border: 0; border-top: var(--bw) solid var(--ink); margin: 0; }
+
+  /* --- outline button (frame-runs, ported verbatim) -------- */
+  .btn {
+    --run-x: 76%; --run-y: 60%; --cut: 12px;
+    position: relative; display: inline-flex; align-items: center; gap: 10px;
+    padding: 11px 20px; background: var(--paper); color: var(--ink);
+    font-family: var(--font-mono), monospace; font-size: 12px; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer;
+    transition: background 0.2s var(--ease), color 0.2s var(--ease);
+  }
+  .btn::before { content: ''; flex: none; width: 14px; height: var(--bw); background: currentColor; }
+  .btn::after {
+    content: ''; position: absolute; inset: 0; pointer-events: none;
+    --diag: linear-gradient(135deg,
+      transparent calc(50% - var(--bw)/2), currentColor calc(50% - var(--bw)/2),
+      currentColor calc(50% + var(--bw)/2), transparent calc(50% + var(--bw)/2));
+    background-image:
+      linear-gradient(currentColor, currentColor), linear-gradient(currentColor, currentColor),
+      linear-gradient(currentColor, currentColor), linear-gradient(currentColor, currentColor),
+      var(--diag), var(--diag);
+    background-repeat: no-repeat;
+    background-size:
+      var(--run-x) var(--bw), var(--bw) var(--run-y),
+      var(--run-x) var(--bw), var(--bw) var(--run-y),
+      var(--cut) var(--cut), var(--cut) var(--cut);
+    background-position:
+      var(--cut) 0, 0 var(--cut),
+      calc(100% - var(--cut)) 100%, 100% calc(100% - var(--cut)),
+      0 0, 100% 100%;
+    transition: background-size 0.3s var(--ease), background-position 0.3s var(--ease);
+  }
+  .btn:hover { --run-x: 100%; --run-y: 100%; --cut: 20px; }
+  .btn:active { --cut: 8px; }
+  .btn:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* --- filled button (chamfer via clip-path) --------------- */
+  .btn--fill {
+    --cut: 12px;
+    position: relative; display: inline-flex; align-items: center; justify-content: center; gap: 10px;
+    width: 100%; padding: 13px 24px; background: var(--ink); color: var(--paper);
+    font-family: var(--font-mono), monospace; font-size: 12px; font-weight: 500;
+    letter-spacing: 0.14em; text-transform: uppercase; cursor: pointer;
+    clip-path: polygon(var(--cut) 0, 100% 0, 100% calc(100% - var(--cut)),
+      calc(100% - var(--cut)) 100%, 0 100%, 0 var(--cut));
+    transition: background 0.2s var(--ease), color 0.2s var(--ease), clip-path 0.2s var(--ease);
+  }
+  .btn--fill::before { content: ''; flex: none; width: 14px; height: var(--bw); background: currentColor; }
+  .btn--fill:hover { --cut: 20px; }
+  .btn--fill:active { --cut: 8px; }
+  .btn--fill:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn--fill:focus-visible { outline: none; }
+  .btn--fill:focus-visible::after {
+    content: ''; position: absolute; inset: 7px; border: var(--bw) solid currentColor; pointer-events: none;
+  }
+
+  /* --- chip / toggle (checkbox labels + presets) ----------- */
+  .chip, .quick-btn {
+    position: relative;
+    display: inline-flex; align-items: center; gap: 6px;
+    min-height: 40px; padding: 8px 14px;
+    background: var(--paper); color: var(--ink);
+    border: var(--bw) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--drop-sm);
+    font-family: var(--font-mono), monospace; font-size: 11px; font-weight: 500;
+    letter-spacing: 0.12em; text-transform: uppercase; cursor: pointer; user-select: none;
+    transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease),
+      background 0.2s var(--ease), color 0.2s var(--ease);
+  }
+  .chip:hover, .quick-btn:hover { transform: translate(2px, 2px); box-shadow: none; }
+  .quick-btn:active { transform: translate(2px, 2px); box-shadow: none; }
+  .chip input { position: absolute; width: 1px; height: 1px; opacity: 0; pointer-events: none; }
+  .chip::before {
+    content: ''; flex: none; width: 14px; height: 14px;
+    border: 2px solid currentColor; border-radius: 2px; background: transparent;
+  }
+  .chip:has(input:checked)::before {
+    border-color: var(--paper);
+    background: var(--paper) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 14 14'%3E%3Cpath d='M2.5 7.5 L5.5 10.5 L11 3.5' fill='none' stroke='%23101010' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") center / 12px 12px no-repeat;
+  }
+  .chip:has(input:checked) { background: var(--ink); color: var(--paper); }
+  .chip:has(input:focus-visible) { outline: var(--bw) solid var(--ink); outline-offset: 3px; }
+  .chip:disabled, .quick-btn:disabled, .chip:has(input:disabled) { opacity: 0.4; cursor: not-allowed; }
+
+  /* --- inputs ---------------------------------------------- */
+  .hud-label {
+    display: block; margin-bottom: 6px;
+    font-family: var(--font-mono), monospace; font-size: 10px;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .hud-input {
+    width: 110px; padding: 9px 10px; background: var(--paper); color: var(--ink);
+    border: var(--bw) solid var(--ink); border-radius: var(--radius);
+    font-family: var(--font-mono), monospace; font-size: 13px;
+    font-variant-numeric: tabular-nums;
+  }
+  .hud-input:disabled { background: var(--paper-alt); color: var(--ink-soft); cursor: not-allowed; }
+
+  /* --- slider (as a HUD meter) ----------------------------- */
+  .hud-slider {
+    -webkit-appearance: none; appearance: none; flex: 1; height: 3px;
+    background: var(--slab-soft); border: 1px solid var(--ink); border-radius: 0;
+  }
+  .hud-slider::-webkit-slider-thumb {
+    -webkit-appearance: none; width: 14px; height: 14px;
+    background: var(--ink); border: 0; border-radius: 0; cursor: pointer;
+  }
+  .hud-slider::-moz-range-thumb {
+    width: 14px; height: 14px; background: var(--ink); border: 0; border-radius: 0; cursor: pointer;
+  }
+  .hud-value {
+    min-width: 42px; text-align: right;
+    font-family: var(--font-mono), monospace; font-size: 12px; font-weight: 500;
+    font-variant-numeric: tabular-nums; letter-spacing: 0.06em;
+  }
+  #qualityRow:not(.hidden) { display: flex; align-items: center; gap: 14px; }
+
+  /* --- callout --------------------------------------------- */
+  .callout {
+    padding: 10px 14px; background: var(--paper); border: var(--bw) solid var(--ink);
+    font-family: var(--font-mono), monospace; font-size: 11px; line-height: 1.5;
+    letter-spacing: 0.02em; color: var(--ink-soft);
+  }
+
+  /* --- drop zone ------------------------------------------- */
+  .dropzone {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px;
+    padding: clamp(48px, 8vw, 72px) 24px; text-align: center; cursor: pointer;
+    color: var(--ink); border: var(--bw) dashed var(--ink); border-radius: var(--radius-lg);
+    box-shadow: var(--drop);
+    background: repeating-linear-gradient(45deg,
+      var(--paper-alt), var(--paper-alt) 10px, var(--slab-soft) 10px, var(--slab-soft) 20px);
+    transition: border-color 0.2s var(--ease), background 0.2s var(--ease);
+  }
+  .dropzone__icon { width: 46px; height: 46px; color: var(--ink); }
+  .dropzone__title {
+    font-family: var(--font-display), monospace; font-weight: 600;
+    font-size: clamp(16px, 2vw, 22px); letter-spacing: 0.1em; text-transform: uppercase;
+  }
+  .dropzone__sub {
+    font-family: var(--font-mono), monospace; font-size: 11px;
+    letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .dropzone-active { border-style: solid; background: var(--paper-alt); }
+
+  /* --- control panel (kept fixed on the left ≥1024px) ------ */
+  #controlPanel {
+    background: var(--paper); border: var(--bw) solid var(--ink);
+    border-radius: var(--radius-lg); box-shadow: var(--drop);
+  }
+  #controlPanel h3 { color: var(--ink); }
+  @media (min-width: 1024px) {
+    #controlPanel {
+      top: calc(var(--header-total) + 16px); left: var(--gutter);
+      width: 320px; max-height: calc(100vh - var(--header-total) - 32px);
+    }
+  }
+
+  /* --- image cards (JS-generated; skinned via structure) --- */
+  #imageGrid > div {
+    background: var(--paper); border: var(--bw) solid var(--ink);
+    border-radius: var(--radius-lg); box-shadow: var(--drop);
+    font-family: var(--font-mono), monospace; color: var(--ink);
+  }
+  #imageGrid > div > p:first-child {
+    font-family: var(--font-display), monospace; font-weight: 600;
+    font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink);
+    padding-bottom: 8px; border-bottom: var(--bw) solid var(--ink);
+  }
+  #imageGrid .bg-gray-100 {
+    background: repeating-linear-gradient(45deg,
+      var(--paper-alt), var(--paper-alt) 10px, var(--slab-soft) 10px, var(--slab-soft) 20px);
+    border: 1px solid var(--ink); border-radius: var(--radius);
+  }
+  #imageGrid .text-\[11px\] {
+    color: var(--ink-faint); letter-spacing: 0.08em; text-transform: uppercase;
+    font-variant-numeric: tabular-nums;
+  }
+  #imageGrid .card-btn {
+    background: var(--paper); color: var(--ink);
+    border: var(--bw) solid var(--ink); border-radius: var(--radius); box-shadow: var(--drop-sm);
+    font-size: 10px; font-weight: 500; letter-spacing: 0.1em; text-transform: uppercase;
+    transition: transform 0.15s var(--ease), box-shadow 0.15s var(--ease),
+      background 0.2s var(--ease), color 0.2s var(--ease);
+  }
+  #imageGrid .card-btn:hover:not(:disabled) {
+    transform: translate(2px, 2px); box-shadow: none;
+    background: var(--ink); color: var(--paper);
+  }
+  #imageGrid .card-btn:disabled { opacity: 0.35; }
+
+  /* --- processing spinner (square, stepped) ---------------- */
+  .spinner {
+    width: 18px; height: 18px; border-radius: 0;
+    border: var(--bw) solid var(--slab-soft); border-top-color: var(--ink);
+    animation: spin 0.8s steps(8, end) infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* --- fixed action bar (pinned bottom-right) -------------- */
+  .hud-actionbar {
+    position: fixed; right: var(--gutter); bottom: 20px; z-index: 40;
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px;
+    padding: 10px; background: var(--paper);
+    border: var(--bw) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--drop);
+  }
+  .hud-actiontotal {
+    font-family: var(--font-mono), monospace; font-size: 12px; font-weight: 600;
+    letter-spacing: 0.08em; text-transform: uppercase; font-variant-numeric: tabular-nums;
+    padding: 0 6px 0 4px; white-space: nowrap;
+  }
+
+  /* --- before / after compare ------------------------------ */
+  .compare, .compare-slot {
+    position: relative; height: 150px; overflow: hidden;
+    border: var(--bw) solid var(--ink); border-radius: var(--radius);
+    background: repeating-linear-gradient(45deg,
+      var(--paper-alt), var(--paper-alt) 10px, var(--slab-soft) 10px, var(--slab-soft) 20px);
+  }
+  .compare { cursor: ew-resize; touch-action: none; user-select: none; }
+  .compare__img {
+    position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain;
+    pointer-events: none; -webkit-user-drag: none; user-select: none;
+  }
+  .compare__overlay {
+    position: absolute; inset: 0; overflow: hidden;
+    clip-path: inset(0 calc(100% - var(--pos, 50%)) 0 0);
+  }
+  .compare__divider {
+    position: absolute; top: 0; bottom: 0; left: var(--pos, 50%);
+    width: 2px; background: var(--ink); transform: translateX(-1px);
+    pointer-events: none; z-index: 3;
+  }
+  .compare__handle {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    display: grid; place-items: center; width: 26px; height: 26px;
+    background: var(--paper); border: 2px solid var(--ink); border-radius: 50%;
+    box-shadow: var(--drop-sm);
+  }
+  .compare__handle::before { content: '\21C4'; font-size: 12px; color: var(--ink); }
+  .compare__label {
+    position: absolute; bottom: 6px; z-index: 2; padding: 2px 6px;
+    background: var(--ink); color: var(--paper);
+    font-family: var(--font-mono), monospace; font-size: 9px;
+    letter-spacing: 0.12em; text-transform: uppercase; pointer-events: none;
+  }
+  .compare__label--before { left: 6px; }
+  .compare__label--after { right: 6px; }
+  .compare__expand {
+    position: absolute; top: 6px; right: 6px; z-index: 5;
+    display: grid; place-items: center; width: 28px; height: 28px;
+    background: var(--paper); border: var(--bw) solid var(--ink); border-radius: var(--radius);
+    color: var(--ink); font-size: 13px; cursor: pointer;
+  }
+  .compare-slot { display: grid; place-items: center; }
+  .compare-slot__img { max-width: 100%; max-height: 100%; object-fit: contain; }
+  .compare-slot__tag {
+    position: absolute; bottom: 6px; left: 6px; padding: 2px 6px;
+    background: var(--ink); color: var(--paper);
+    font-family: var(--font-mono), monospace; font-size: 9px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+  }
+
+  /* --- compare dialog -------------------------------------- */
+  .hud-dialog {
+    width: min(920px, 92vw); padding: 0; color: var(--ink); background: var(--paper);
+    border: var(--bw) solid var(--ink); border-radius: var(--radius-lg); box-shadow: var(--drop-ink);
+  }
+  .hud-dialog::backdrop { background: rgba(16, 16, 16, 0.55); }
+  .hud-dialog__head {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px;
+    padding: 12px 16px; border-bottom: var(--bw) solid var(--ink);
+  }
+  .hud-dialog__close {
+    display: grid; place-items: center; width: 32px; height: 32px;
+    background: var(--paper); border: var(--bw) solid var(--ink); border-radius: var(--radius);
+    color: var(--ink); font-size: 14px; cursor: pointer;
+  }
+  .hud-dialog__body { padding: 16px; }
+  .hud-dialog__body .compare { height: min(60vh, 560px); }
+  .hud-dialog__foot {
+    display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap;
+    padding: 12px 16px; border-top: var(--bw) solid var(--ink);
+  }
+
+  /* --- toast ----------------------------------------------- */
+  .hud-toast {
+    position: fixed; top: 16px; right: 16px; z-index: 50;
+    padding: 10px 16px; background: var(--ink); color: var(--paper);
+    border: var(--bw) solid var(--ink); box-shadow: var(--drop);
+    font-family: var(--font-mono), monospace; font-size: 11px;
+    letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .hud-toast.hidden { display: none; }
+  @keyframes slideIn {
+    from { transform: translateY(-10px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+  }
+  .toast-anim { animation: slideIn 0.3s ease-out; }
+
+  /* --- reduced motion -------------------------------------- */
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after {
+      animation-duration: 0.001ms !important;
+      transition-duration: 0.001ms !important;
+    }
+    .hud-status::before { animation: none !important; opacity: 1; }
+  }
+</style>
+</head>
+<body class="min-h-screen">
+
+  <!-- Header strip -->
+  <header class="hud-header">
+    <div class="hud-header__row">
+      <span class="hud-tab">IMAGE_TOOL</span>
+      <span class="hud-wire"></span>
+      <div class="hud-bar">
+        <span class="hud-status">ONLINE</span>
+        <span>LOCAL / NO-UPLOAD</span>
+      </div>
+    </div>
+    <div class="hud-meta">
+      <span>COMPRESS · RESIZE</span>
+      <span class="hud-meta__right">JOHNSON LEE / FRONT-END DEVELOPER</span>
+    </div>
+  </header>
+
+  <main class="px-4 py-8 pb-32 lg:ml-[22rem]">
+
+    <!-- Upload area -->
+    <section id="uploadSection">
+      <div class="hud-section-head">
+        <span class="readout">[ INPUT_01 ]</span>
+        <h2 class="hud-title">Image Compressor / Resizer</h2>
+      </div>
+      <div id="dropzone" class="dropzone">
+        <svg class="dropzone__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+        <p class="dropzone__title">Drop images here</p>
+        <p class="dropzone__sub">Click to select · PNG / JPG / WEBP · ≤30MB</p>
+        <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" class="hidden" multiple />
+      </div>
+    </section>
+
+    <!-- Work area (shown after upload) -->
+    <section id="workSection" class="hidden mt-8 space-y-6">
+
+      <!-- Grid header -->
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <p id="imageCountLabel" class="hud-note"></p>
+        <span class="readout">[ QUEUE ]</span>
+      </div>
+
+      <!-- Grid of all images: original vs. result side by side per card -->
+      <div id="imageGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5"></div>
+
+      <!-- Fixed action bar, pinned bottom-right; hidden with workSection until upload -->
+      <div class="hud-actionbar">
+        <span id="totalSaved" class="hud-actiontotal">TOTAL —</span>
+        <button id="addMoreBtn" class="btn">Add more</button>
+        <button id="downloadAllImagesBtn" class="btn--fill" style="width:auto">Download all</button>
+      </div>
+    </section>
+
+    <!-- Settings panel — always visible; floats on the left on large screens -->
+    <div id="controlPanel" class="bg-white rounded-xl border border-gray-200 p-5 space-y-6 mt-8 lg:mt-0 lg:fixed lg:top-4 lg:left-4 lg:w-80 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:shadow-xl lg:z-10 lg:space-y-5">
+
+        <!-- Resize settings -->
+        <div>
+          <h3 class="readout mb-3">Resize</h3>
+          <div class="flex flex-wrap items-end gap-3">
+            <div>
+              <label class="hud-label">Target width (px)</label>
+              <input id="widthInput" type="number" min="1" class="hud-input" />
+            </div>
+            <div>
+              <label class="hud-label">Target height (px)</label>
+              <input id="heightInput" type="number" min="1" class="hud-input" />
+            </div>
+          </div>
+          <div class="flex flex-wrap items-center gap-2 mt-3">
+            <label class="chip">
+              <input id="keepRatio" type="checkbox" checked />
+              Keep ratio
+            </label>
+            <label class="chip">
+              <input id="noEnlarge" type="checkbox" checked />
+              Don't enlarge
+            </label>
+          </div>
+          <p id="currentSizeLabel" class="hud-note mt-3"></p>
+
+          <!-- Quick preset buttons -->
+          <div class="flex flex-wrap gap-2 mt-4">
+            <button data-percent="50" class="quick-btn">50%</button>
+            <button data-percent="75" class="quick-btn">75%</button>
+            <button data-percent="100" class="quick-btn">100%</button>
+            <button data-width="1920" class="quick-btn">1920w</button>
+            <button data-width="1280" class="quick-btn">1280w</button>
+            <button data-width="1080" class="quick-btn">1080w</button>
+          </div>
+        </div>
+
+        <hr class="hud-hr" />
+
+        <!-- Compression settings -->
+        <div>
+          <div class="flex items-center justify-between mb-3 flex-wrap gap-2">
+            <h3 class="readout">Compression</h3>
+            <label class="chip">
+              <input id="manualQuality" type="checkbox" />
+              Manual
+            </label>
+          </div>
+          <div id="qualityRow" class="hidden">
+            <label class="hud-note" for="qualitySlider">Quality</label>
+            <input id="qualitySlider" type="range" min="0" max="100" value="100" class="hud-slider" />
+            <span id="qualityValue" class="hud-value">100</span>
+          </div>
+          <p class="callout mt-3">By default images are auto-compressed — PNGs use colour quantization (an optimized palette + dithering, the same idea as TinyPNG), JPG / WebP use an automatic quality. Enable “Manual” to control it yourself (100 = lossless).</p>
+        </div>
+
+        <!-- Process button -->
+        <div>
+          <button id="processBtn" class="btn--fill">Process all images</button>
+        </div>
+    </div>
+  </main>
+
+  <!-- Toast notification -->
+  <div id="toast" class="hud-toast hidden toast-anim"></div>
+
+  <!-- Compare dialog -->
+  <dialog id="compareDialog" class="hud-dialog">
+    <div class="hud-dialog__head">
+      <span id="dialogTitle" class="readout"></span>
+      <button id="dialogClose" class="hud-dialog__close" aria-label="Close">✕</button>
+    </div>
+    <div id="dialogCompare" class="hud-dialog__body"></div>
+    <div class="hud-dialog__foot">
+      <span id="dialogStats" class="hud-note"></span>
+      <button id="dialogDownload" class="btn--fill" style="width:auto">Download this image</button>
+    </div>
+  </dialog>
+
+<script>
+/* ===================== Global state ===================== */
+// images: array of { file, originalUrl, img(Image object), width, height, resultBlob, resultUrl, resizedBlob, resizedUrl }
+let images = [];
+let isProcessing = false;
+const MAX_DIMENSION = 8000; // safety cap to avoid canvas freezing on huge images
+const AUTO_LOSSY_QUALITY = 0.82;  // default JPG/WebP quality when "Manual quality" is off
+const AUTO_PNG_COLORS = 256;      // default palette size for auto PNG quantization
+
+const dropzone = document.getElementById('dropzone');
+const fileInput = document.getElementById('fileInput');
+const uploadSection = document.getElementById('uploadSection');
+const workSection = document.getElementById('workSection');
+const imageCountLabel = document.getElementById('imageCountLabel');
+const imageGrid = document.getElementById('imageGrid');
+const addMoreBtn = document.getElementById('addMoreBtn');
+
+const widthInput = document.getElementById('widthInput');
+const heightInput = document.getElementById('heightInput');
+const keepRatio = document.getElementById('keepRatio');
+const noEnlarge = document.getElementById('noEnlarge');
+const currentSizeLabel = document.getElementById('currentSizeLabel');
+const qualitySlider = document.getElementById('qualitySlider');
+const qualityValue = document.getElementById('qualityValue');
+const manualQuality = document.getElementById('manualQuality');
+const qualityRow = document.getElementById('qualityRow');
+const processBtn = document.getElementById('processBtn');
+const controlPanel = document.getElementById('controlPanel');
+
+const downloadAllImagesBtn = document.getElementById('downloadAllImagesBtn');
+const toast = document.getElementById('toast');
+const totalSaved = document.getElementById('totalSaved');
+const compareDialog = document.getElementById('compareDialog');
+const dialogTitle = document.getElementById('dialogTitle');
+const dialogCompare = document.getElementById('dialogCompare');
+const dialogStats = document.getElementById('dialogStats');
+const dialogDownload = document.getElementById('dialogDownload');
+const dialogClose = document.getElementById('dialogClose');
+
+/* ===================== Utility functions ===================== */
+function formatBytes(bytes) {
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / (1024 * 1024)).toFixed(2) + ' MB';
+}
+
+function showToast(message) {
+  toast.textContent = message;
+  toast.classList.remove('hidden');
+  toast.classList.remove('toast-anim');
+  // Force reflow so the animation replays
+  void toast.offsetWidth;
+  toast.classList.add('toast-anim');
+  clearTimeout(toast._timer);
+  toast._timer = setTimeout(() => toast.classList.add('hidden'), 2500);
+}
+
+function triggerDownload(blob, filename) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+/* ===================== File loading ===================== */
+function handleFiles(fileArray) {
+  const valid = fileArray.filter(f => /^image\/(png|jpeg|jpg|webp)$/.test(f.type));
+  if (valid.length === 0) {
+    showToast('Please select PNG / JPG / WebP image files');
+    return;
+  }
+
+  valid.forEach(file => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        if (img.width > MAX_DIMENSION || img.height > MAX_DIMENSION) {
+          showToast(`Image ${file.name} is too large and was skipped`);
+          return;
+        }
+        const isFirstImage = images.length === 0;
+        images.push({
+          file,
+          originalUrl: e.target.result,
+          img,
+          width: img.width,
+          height: img.height,
+          resultBlob: null,
+          resultUrl: null,
+          resizedBlob: null,
+          resizedUrl: null,
+        });
+        if (isFirstImage) {
+          // Seed the resize fields from the first image uploaded; later images
+          // are scaled relative to this reference when batch-processing.
+          widthInput.value = img.width;
+          heightInput.value = img.height;
+        }
+        renderGrid();
+      };
+      img.onerror = () => showToast(`Failed to read image: ${file.name}`);
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+
+  uploadSection.classList.add('hidden');
+  workSection.classList.remove('hidden');
+}
+
+/* Keep the control panel visible at all times, but disable + dim it until there's an
+   image to work on (and lock it while processing is running). */
+function refreshControls() {
+  const hasImages = images.length > 0;
+  const interactive = hasImages && !isProcessing;
+  controlPanel.querySelectorAll('input, button').forEach(el => { el.disabled = !interactive; });
+  // With "Keep ratio" on, each image derives its own height from the target width,
+  // so the height field is display-only (it previews the 1st image's result).
+  heightInput.disabled = !interactive || keepRatio.checked;
+  controlPanel.classList.toggle('opacity-60', !hasImages);
+}
+
+/* ===================== Grid rendering ===================== */
+// The target width is absolute (every image gets it); the reference image only seeds
+// the fields, the presets and the ratio used to preview the height.
+function updateSizeLabel() {
+  if (!images.length) { currentSizeLabel.textContent = ''; return; }
+  const ref = `Reference size (1st image): ${images[0].width} × ${images[0].height}`;
+  currentSizeLabel.textContent = keepRatio.checked
+    ? `${ref} · height follows each image's own ratio`
+    : `${ref} · every image forced to exactly ${widthInput.value || '?'} × ${heightInput.value || '?'}`;
+}
+
+function renderGrid() {
+  imageCountLabel.textContent = `${images.length} image${images.length === 1 ? '' : 's'} loaded`;
+  updateSizeLabel();
+
+  imageGrid.innerHTML = '';
+  images.forEach((item, idx) => {
+    const card = document.createElement('div');
+    card.className = 'bg-white rounded-xl border border-gray-200 p-4 space-y-3';
+
+    const visual = isProcessing
+      ? '<div class="compare-slot"><div class="spinner"></div></div>'
+      : item.resultUrl
+        ? compareMarkup(idx, item.originalUrl, item.resultUrl, true)
+        : `<div class="compare-slot"><img class="compare-slot__img" src="${item.originalUrl}" /><span class="compare-slot__tag">Pending</span></div>`;
+
+    const infoText = item.resultBlob
+      ? `${item.width}×${item.height} ${formatBytes(item.file.size)} → ${item.processedWidth}×${item.processedHeight} ${formatBytes(item.resultBlob.size)} · -${getSavedPercent(item)}%`
+      : `${item.width} × ${item.height} · ${formatBytes(item.file.size)}`;
+
+    card.innerHTML = `
+      <p class="text-sm font-medium text-gray-700 truncate" title="${item.file.name}">${item.file.name}</p>
+      ${visual}
+      <p class="text-[11px] text-gray-400">${infoText}</p>
+      <div class="flex gap-2">
+        <button data-action="resized" data-idx="${idx}" class="card-btn flex-1 px-2 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed" ${item.resizedBlob ? '' : 'disabled'}>Download Resized</button>
+        <button data-action="compressed" data-idx="${idx}" class="card-btn flex-1 px-2 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed" ${item.resultBlob ? '' : 'disabled'}>Download Compressed</button>
+      </div>
+    `;
+    imageGrid.appendChild(card);
+  });
+
+  refreshControls();
+  updateTotals();
+}
+
+// Click handler for per-card download buttons (delegated, since cards are rebuilt on every render)
+imageGrid.addEventListener('click', (e) => {
+  const btn = e.target.closest('.card-btn');
+  if (!btn) return;
+  const item = images[parseInt(btn.dataset.idx)];
+  if (btn.dataset.action === 'resized' && item.resizedBlob) {
+    triggerDownload(item.resizedBlob, getDownloadFilename(item));
+  } else if (btn.dataset.action === 'compressed' && item.resultBlob) {
+    triggerDownload(item.resultBlob, getDownloadFilename(item));
+  }
+});
+
+/* ===================== Before/after compare + dialog ===================== */
+// Base layer is the AFTER (compressed) image; the overlay holds the BEFORE
+// (original) clipped from the left up to the divider — so left = before,
+// right = after, matching the labels. --pos drives both the clip and divider.
+function compareMarkup(idx, beforeUrl, afterUrl, expandable) {
+  return `
+    <div class="compare" style="--pos:50%">
+      <img class="compare__img" src="${afterUrl}" alt="after (compressed)" />
+      <div class="compare__overlay"><img class="compare__img" src="${beforeUrl}" alt="before (original)" /></div>
+      <div class="compare__divider"><span class="compare__handle"></span></div>
+      <span class="compare__label compare__label--before">Before</span>
+      <span class="compare__label compare__label--after">After</span>
+      ${expandable ? `<button type="button" class="compare__expand" data-idx="${idx}" aria-label="Open compare view">⤢</button>` : ''}
+    </div>`;
+}
+
+// Drag the divider. Pointer events cover mouse + touch; delegated so it survives
+// the grid being rebuilt each render and also works inside the dialog.
+function startCompareDrag(e) {
+  if (e.target.closest('.compare__expand')) return; // let the expand button click through
+  const compare = e.target.closest('.compare');
+  if (!compare) return;
+  const rect = compare.getBoundingClientRect();
+  const move = (x) => {
+    const p = Math.max(0, Math.min(100, ((x - rect.left) / rect.width) * 100));
+    compare.style.setProperty('--pos', p + '%');
+  };
+  move(e.clientX);
+  const onMove = (ev) => move(ev.clientX);
+  const onUp = () => {
+    document.removeEventListener('pointermove', onMove);
+    document.removeEventListener('pointerup', onUp);
+  };
+  document.addEventListener('pointermove', onMove);
+  document.addEventListener('pointerup', onUp);
+  e.preventDefault();
+}
+imageGrid.addEventListener('pointerdown', startCompareDrag);
+dialogCompare.addEventListener('pointerdown', startCompareDrag);
+
+// The expand button opens the enlarged compare dialog for that image.
+imageGrid.addEventListener('click', (e) => {
+  const exp = e.target.closest('.compare__expand');
+  if (exp) openCompare(parseInt(exp.dataset.idx));
+});
+
+function openCompare(idx) {
+  const item = images[idx];
+  if (!item || !item.resultUrl) return;
+  dialogTitle.textContent = item.file.name;
+  dialogCompare.innerHTML = compareMarkup(idx, item.originalUrl, item.resultUrl, false);
+  dialogStats.textContent =
+    `${item.width}×${item.height} ${formatBytes(item.file.size)} → ` +
+    `${item.processedWidth}×${item.processedHeight} ${formatBytes(item.resultBlob.size)} · -${getSavedPercent(item)}%`;
+  dialogDownload.onclick = () => triggerDownload(item.resultBlob, getDownloadFilename(item));
+  if (typeof compareDialog.showModal === 'function') compareDialog.showModal();
+}
+
+dialogClose.addEventListener('click', () => compareDialog.close());
+// A click that lands on the dialog element itself (its backdrop) closes it.
+compareDialog.addEventListener('click', (e) => {
+  if (e.target === compareDialog) compareDialog.close();
+});
+
+// Total compression across every processed image, shown in the action bar.
+function updateTotals() {
+  const done = images.filter((i) => i.resultBlob);
+  if (done.length === 0) { totalSaved.textContent = 'TOTAL —'; return; }
+  const orig = done.reduce((s, i) => s + i.file.size, 0);
+  const comp = done.reduce((s, i) => s + i.resultBlob.size, 0);
+  const pct = orig > 0 ? Math.max(0, (1 - comp / orig) * 100) : 0;
+  totalSaved.textContent = `TOTAL -${pct.toFixed(1)}%`;
+}
+
+function getSavedPercent(item) {
+  const originalSize = item.file.size;
+  const newSize = item.resultBlob.size;
+  return originalSize > 0 ? Math.max(0, ((1 - newSize / originalSize) * 100)).toFixed(1) : 0;
+}
+
+/* ===================== Width/height linking (relative to the first image) ===================== */
+function getAspectRatio() {
+  return images[0].width / images[0].height;
+}
+
+widthInput.addEventListener('input', () => {
+  if (images.length === 0) return;
+  if (keepRatio.checked) {
+    const ratio = getAspectRatio();
+    const w = parseInt(widthInput.value) || 0;
+    heightInput.value = Math.round(w / ratio);
+  }
+  updateSizeLabel();
+});
+
+heightInput.addEventListener('input', () => {
+  if (images.length === 0) return;
+  updateSizeLabel();
+});
+
+// Toggling the lock re-derives the previewed height and enables/disables the field.
+keepRatio.addEventListener('change', () => {
+  if (images.length && keepRatio.checked) {
+    const w = parseInt(widthInput.value) || 0;
+    heightInput.value = Math.round(w / getAspectRatio());
+  }
+  refreshControls();
+  updateSizeLabel();
+});
+
+/* Quick preset buttons (percentages/widths are relative to the first image) */
+document.querySelectorAll('.quick-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    if (images.length === 0) return;
+    const refItem = images[0];
+    if (btn.dataset.percent) {
+      const percent = parseInt(btn.dataset.percent) / 100;
+      widthInput.value = Math.round(refItem.width * percent);
+      heightInput.value = Math.round(refItem.height * percent);
+    } else if (btn.dataset.width) {
+      const targetWidth = parseInt(btn.dataset.width);
+      widthInput.value = targetWidth;
+      heightInput.value = Math.round(targetWidth / getAspectRatio());
+    }
+    updateSizeLabel();
+  });
+});
+
+/* Quality slider value display */
+qualitySlider.addEventListener('input', () => {
+  qualityValue.textContent = qualitySlider.value;
+});
+
+/* Show/hide the manual quality slider (auto-compression when unchecked) */
+manualQuality.addEventListener('change', () => {
+  qualityRow.classList.toggle('hidden', !manualQuality.checked);
+});
+
+/* ===================== Core processing: Resize + Compress ===================== */
+function resizeImageToCanvas(img, targetW, targetH) {
+  const canvas = document.createElement('canvas');
+  canvas.width = targetW;
+  canvas.height = targetH;
+  const ctx = canvas.getContext('2d');
+  ctx.imageSmoothingEnabled = true;
+  ctx.imageSmoothingQuality = 'high';
+  ctx.drawImage(img, 0, 0, targetW, targetH);
+  return canvas;
+}
+
+function canvasToBlob(canvas, mimeType, quality) {
+  return new Promise((resolve) => {
+    canvas.toBlob((blob) => resolve(blob), mimeType, quality);
+  });
+}
+
+// Runs resize + compression for a single image item and stores the resulting blobs on it.
+async function runProcessing(item, targetW, targetH) {
+  const mimeType = item.file.type === 'image/jpeg' || item.file.type === 'image/jpg' ? 'image/jpeg'
+    : item.file.type === 'image/webp' ? 'image/webp'
+    : 'image/png';
+
+  const canvas = resizeImageToCanvas(item.img, targetW, targetH);
+
+  // Resized-only version, keeping original quality (quality=1, no extra compression)
+  const resizedBlob = await canvasToBlob(canvas, mimeType, 1);
+
+  // Compressed version. PNG has no native quality parameter, so it's compressed via colour
+  // quantization (an optimized palette + dithering). JPG/WebP use the quality parameter directly.
+  // When "Manual quality" is off we fall back to sensible automatic settings.
+  const manual = manualQuality.checked;
+  let compressedBlob;
+  if (mimeType === 'image/png') {
+    compressedBlob = await compressPngQuantized(canvas, manual);
+  } else {
+    const quality = manual ? parseInt(qualitySlider.value) / 100 : AUTO_LOSSY_QUALITY;
+    compressedBlob = await canvasToBlob(canvas, mimeType, quality);
+  }
+
+  item.resultBlob = compressedBlob;
+  item.resultUrl = URL.createObjectURL(compressedBlob);
+  item.resizedBlob = resizedBlob;
+  item.resizedUrl = URL.createObjectURL(resizedBlob);
+  item.processedWidth = targetW;
+  item.processedHeight = targetH;
+  item.mimeType = mimeType;
+}
+
+// Processes every loaded image against the configured target width.
+// The target width is absolute: every image is resized to exactly that width
+// (subject to "Don't enlarge"), each deriving its own height from its own
+// aspect ratio — it is NOT a scale factor taken from the first image.
+async function processAllImages() {
+  if (images.length === 0) return;
+  const targetW = parseInt(widthInput.value);
+  if (!targetW || targetW <= 0) {
+    showToast('Please enter a valid target width first');
+    return;
+  }
+  const ratioLocked = keepRatio.checked;
+  const targetH = parseInt(heightInput.value);
+  if (!ratioLocked && (!targetH || targetH <= 0)) {
+    showToast('Please enter a valid target height first');
+    return;
+  }
+
+  isProcessing = true;
+  processBtn.disabled = true;
+  renderGrid();
+
+  // Give the browser a chance to render the loading spinners before the heavy work starts
+  await new Promise(r => setTimeout(r, 30));
+
+  try {
+    for (const item of images) {
+      let w, h;
+      if (ratioLocked) {
+        w = targetW;
+        // "Don't enlarge" is decided per image against its own original width,
+        // so a small image in the batch is never blown up — and never shrunk
+        // just because a larger image happens to be first in the queue.
+        if (noEnlarge.checked && w > item.width) w = item.width;
+        h = Math.round(w * (item.height / item.width));
+      } else {
+        // Ratio unlocked: both fields are honoured verbatim, distortion included.
+        w = noEnlarge.checked ? Math.min(targetW, item.width) : targetW;
+        h = noEnlarge.checked ? Math.min(targetH, item.height) : targetH;
+      }
+      w = Math.max(1, Math.min(MAX_DIMENSION, w));
+      h = Math.max(1, Math.min(MAX_DIMENSION, h));
+      await runProcessing(item, w, h);
+    }
+    showToast(`Processed ${images.length} image(s)!`);
+  } catch (err) {
+    console.error(err);
+    showToast('Processing failed, please try a smaller size');
+  } finally {
+    isProcessing = false;
+    processBtn.disabled = false;
+    renderGrid();
+  }
+}
+
+/* PNG "lossy" compression via colour quantization (the TinyPNG approach).
+   PNG is lossless and canvas.toBlob has no quality parameter for it, so instead we reduce the
+   image to an optimized palette (median-cut) and dither it (Floyd–Steinberg). Fewer distinct
+   colours means the PNG's DEFLATE stage compresses far better, while full resolution and sharp
+   edges are preserved — unlike the old downscale/upscale trick which just blurred the image.
+
+   - manual off  -> auto: quantize to AUTO_PNG_COLORS colours.
+   - manual on   -> the Quality slider drives the palette size; 100 = lossless (no quantization). */
+async function compressPngQuantized(sourceCanvas, manual) {
+  let numColors = AUTO_PNG_COLORS;
+  if (manual) {
+    const q = parseInt(qualitySlider.value);
+    if (q >= 100) {
+      // Lossless: export the untouched canvas directly.
+      return canvasToBlob(sourceCanvas, 'image/png', 1);
+    }
+    // Map quality 0..99 -> ~4..255 palette colours.
+    numColors = Math.max(2, Math.round(4 + (q / 100) * 251));
+  }
+
+  // Work on a copy so the shared resize canvas (used for the "Resized" download) is untouched.
+  const work = document.createElement('canvas');
+  work.width = sourceCanvas.width;
+  work.height = sourceCanvas.height;
+  work.getContext('2d').drawImage(sourceCanvas, 0, 0);
+
+  quantizeCanvas(work, numColors);
+  return canvasToBlob(work, 'image/png', 1);
+}
+
+/* Reduce a canvas to `numColors` colours in place, with Floyd–Steinberg dithering.
+   Alpha is preserved per-pixel; only RGB is quantized. */
+function quantizeCanvas(canvas, numColors) {
+  const ctx = canvas.getContext('2d');
+  const w = canvas.width, h = canvas.height;
+  const imageData = ctx.getImageData(0, 0, w, h);
+  const data = imageData.data;
+
+  const palette = buildPalette(data, numColors);
+  const nearest = makeNearestFinder(palette);
+
+  // Float buffer holds error-diffused RGB values at full precision.
+  const buf = new Float32Array(w * h * 3);
+  for (let i = 0, j = 0; i < data.length; i += 4, j += 3) {
+    buf[j] = data[i]; buf[j + 1] = data[i + 1]; buf[j + 2] = data[i + 2];
+  }
+
+  const clamp = (v) => v < 0 ? 0 : v > 255 ? 255 : v;
+  const spread = (x, y, er, eg, eb, f) => {
+    if (x < 0 || x >= w || y < 0 || y >= h) return;
+    const p = (y * w + x) * 3;
+    buf[p] += er * f; buf[p + 1] += eg * f; buf[p + 2] += eb * f;
+  };
+
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      const p = (y * w + x) * 3;
+      const r = clamp(buf[p]), g = clamp(buf[p + 1]), b = clamp(buf[p + 2]);
+      const pc = palette[nearest(r, g, b)];
+      const di = (y * w + x) * 4;
+      data[di] = pc[0]; data[di + 1] = pc[1]; data[di + 2] = pc[2];
+      // data[di + 3] (alpha) is left untouched.
+      const er = r - pc[0], eg = g - pc[1], eb = b - pc[2];
+      spread(x + 1, y,     er, eg, eb, 7 / 16);
+      spread(x - 1, y + 1, er, eg, eb, 3 / 16);
+      spread(x,     y + 1, er, eg, eb, 5 / 16);
+      spread(x + 1, y + 1, er, eg, eb, 1 / 16);
+    }
+  }
+
+  ctx.putImageData(imageData, 0, 0);
+}
+
+/* Build an optimized palette via median-cut over a 5-bit-per-channel colour histogram. */
+function buildPalette(data, numColors) {
+  const map = new Map();
+  for (let i = 0; i < data.length; i += 4) {
+    if (data[i + 3] === 0) continue; // ignore fully transparent pixels
+    const r = data[i], g = data[i + 1], b = data[i + 2];
+    const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+    const e = map.get(key);
+    if (e) { e.c++; e.r += r; e.g += g; e.b += b; }
+    else map.set(key, { c: 1, r, g, b });
+  }
+
+  const entries = [...map.values()];
+  if (entries.length === 0) return [[0, 0, 0]];
+
+  let boxes = [makeBox(entries)];
+  while (boxes.length < numColors) {
+    // Split the box with the largest colour volume that still has room to split.
+    let bi = -1, best = -1;
+    for (let i = 0; i < boxes.length; i++) {
+      if (boxes[i].entries.length < 2) continue;
+      if (boxes[i].volume > best) { best = boxes[i].volume; bi = i; }
+    }
+    if (bi < 0) break;
+    boxes.splice(bi, 1, ...splitBox(boxes[bi]));
+  }
+  return boxes.map(box => box.color);
+}
+
+function makeBox(entries) {
+  let rmin = 255, rmax = 0, gmin = 255, gmax = 0, bmin = 255, bmax = 0;
+  let rs = 0, gs = 0, bs = 0, cs = 0;
+  for (const e of entries) {
+    const ar = e.r / e.c, ag = e.g / e.c, ab = e.b / e.c;
+    if (ar < rmin) rmin = ar; if (ar > rmax) rmax = ar;
+    if (ag < gmin) gmin = ag; if (ag > gmax) gmax = ag;
+    if (ab < bmin) bmin = ab; if (ab > bmax) bmax = ab;
+    rs += e.r; gs += e.g; bs += e.b; cs += e.c;
+  }
+  const rRange = rmax - rmin, gRange = gmax - gmin, bRange = bmax - bmin;
+  const m = Math.max(rRange, gRange, bRange);
+  return {
+    entries,
+    color: cs ? [Math.round(rs / cs), Math.round(gs / cs), Math.round(bs / cs)] : [0, 0, 0],
+    volume: rRange * gRange * bRange,
+    axis: m === rRange ? 'r' : m === gRange ? 'g' : 'b',
+  };
+}
+
+function splitBox(box) {
+  const axis = box.axis;
+  const sorted = box.entries.slice().sort((a, b) => a[axis] / a.c - b[axis] / b.c);
+  const total = sorted.reduce((s, e) => s + e.c, 0);
+  let acc = 0, split = 1;
+  for (let i = 0; i < sorted.length; i++) {
+    acc += sorted[i].c;
+    if (acc >= total / 2) { split = i + 1; break; }
+  }
+  split = Math.min(Math.max(split, 1), sorted.length - 1);
+  return [makeBox(sorted.slice(0, split)), makeBox(sorted.slice(split))];
+}
+
+/* Nearest-palette lookup, cached per 5-bit-per-channel bucket so the search stays fast
+   regardless of image size (at most 32768 palette scans). */
+function makeNearestFinder(palette) {
+  const cache = new Int16Array(32768).fill(-1);
+  return (r, g, b) => {
+    const key = ((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3);
+    let idx = cache[key];
+    if (idx >= 0) return idx;
+    let best = 0, bestD = Infinity;
+    for (let i = 0; i < palette.length; i++) {
+      const p = palette[i];
+      const dr = r - p[0], dg = g - p[1], db = b - p[2];
+      const d = dr * dr + dg * dg + db * db;
+      if (d < bestD) { bestD = d; best = i; }
+    }
+    cache[key] = best;
+    return best;
+  };
+}
+
+/* ===================== Download ===================== */
+// Keeps the original filename untouched (no _resized / _compressed suffix).
+function getDownloadFilename(item) {
+  return item.file.name;
+}
+
+downloadAllImagesBtn.addEventListener('click', async () => {
+  const processed = images.filter(item => item.resultBlob);
+  if (processed.length === 0) {
+    showToast('No processed images to download yet');
+    return;
+  }
+  for (let i = 0; i < processed.length; i++) {
+    triggerDownload(processed[i].resultBlob, getDownloadFilename(processed[i]));
+    await new Promise(r => setTimeout(r, 300));
+  }
+});
+
+/* ===================== Upload event bindings ===================== */
+dropzone.addEventListener('click', () => fileInput.click());
+
+fileInput.addEventListener('change', (e) => {
+  handleFiles(Array.from(e.target.files));
+  fileInput.value = '';
+});
+
+['dragenter', 'dragover'].forEach(evt => {
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.add('dropzone-active');
+  });
+});
+
+['dragleave', 'drop'].forEach(evt => {
+  dropzone.addEventListener(evt, (e) => {
+    e.preventDefault();
+    dropzone.classList.remove('dropzone-active');
+  });
+});
+
+dropzone.addEventListener('drop', (e) => {
+  const files = Array.from(e.dataTransfer.files);
+  handleFiles(files);
+});
+
+addMoreBtn.addEventListener('click', () => fileInput.click());
+
+processBtn.addEventListener('click', processAllImages);
+
+// Initial state: panel is shown but disabled until the first image is added.
+refreshControls();
+</script>
+</body>
+</html>
