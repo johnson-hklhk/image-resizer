@@ -922,7 +922,7 @@ async function runProcessing(item, targetW, targetH) {
   const canvas = resizeImageToCanvas(item.img, targetW, targetH);
 
   // Resized-only version, keeping original quality (quality=1, no extra compression)
-  const resizedBlob = await canvasToBlob(canvas, mimeType, 1);
+  let resizedBlob = await canvasToBlob(canvas, mimeType, 1);
 
   // Compressed version. PNG has no native quality parameter, so it's compressed via colour
   // quantization (an optimized palette + dithering). JPG/WebP use the quality parameter directly.
@@ -934,6 +934,19 @@ async function runProcessing(item, targetW, targetH) {
   } else {
     const quality = manual ? parseInt(qualitySlider.value) / 100 : AUTO_LOSSY_QUALITY;
     compressedBlob = await canvasToBlob(canvas, mimeType, quality);
+  }
+
+  // Re-encoding can lose to what we already have. canvas.toBlob always writes 32-bit RGBA PNG
+  // with default zlib settings and no filter search, so a well-optimized source (a flat
+  // screenshot, an already-squeezed JPG) can easily come back bigger than it went in.
+  // Never hand the user a file larger than a valid alternative of the same geometry.
+  if (compressedBlob.size > resizedBlob.size) compressedBlob = resizedBlob;
+
+  // When the geometry is untouched, the original bytes are a valid candidate too — and for
+  // already-optimized sources they usually win outright.
+  if (targetW === item.width && targetH === item.height) {
+    if (item.file.size < resizedBlob.size) resizedBlob = item.file;
+    if (item.file.size < compressedBlob.size) compressedBlob = item.file;
   }
 
   item.resultBlob = compressedBlob;
@@ -1020,19 +1033,30 @@ async function compressPngQuantized(sourceCanvas, manual) {
     numColors = Math.max(2, Math.round(4 + (q / 100) * 251));
   }
 
-  // Work on a copy so the shared resize canvas (used for the "Resized" download) is untouched.
+  // Dithering hides banding on photographic content, but on flat artwork — screenshots, UI,
+  // logos — it sprays per-pixel error noise across solid areas and destroys exactly the long
+  // pixel runs PNG's row filters and DEFLATE depend on, so the "compressed" result can end up
+  // bigger than the untouched one. There is no cheap way to predict which case an image is,
+  // so encode it both ways and keep whichever actually came out smaller.
+  const dithered = await quantizeToBlob(sourceCanvas, numColors, true);
+  const flat = await quantizeToBlob(sourceCanvas, numColors, false);
+  return dithered.size <= flat.size ? dithered : flat;
+}
+
+// Quantizes a copy of the canvas (the original is reused for the "Resized" download) and encodes it.
+function quantizeToBlob(sourceCanvas, numColors, dither) {
   const work = document.createElement('canvas');
   work.width = sourceCanvas.width;
   work.height = sourceCanvas.height;
   work.getContext('2d').drawImage(sourceCanvas, 0, 0);
 
-  quantizeCanvas(work, numColors);
+  quantizeCanvas(work, numColors, dither);
   return canvasToBlob(work, 'image/png', 1);
 }
 
-/* Reduce a canvas to `numColors` colours in place, with Floyd–Steinberg dithering.
+/* Reduce a canvas to `numColors` colours in place, optionally with Floyd–Steinberg dithering.
    Alpha is preserved per-pixel; only RGB is quantized. */
-function quantizeCanvas(canvas, numColors) {
+function quantizeCanvas(canvas, numColors, dither = true) {
   const ctx = canvas.getContext('2d');
   const w = canvas.width, h = canvas.height;
   const imageData = ctx.getImageData(0, 0, w, h);
@@ -1040,6 +1064,16 @@ function quantizeCanvas(canvas, numColors) {
 
   const palette = buildPalette(data, numColors);
   const nearest = makeNearestFinder(palette);
+
+  if (!dither) {
+    // Straight nearest-colour mapping: flat areas stay flat, which is what compresses well.
+    for (let i = 0; i < data.length; i += 4) {
+      const pc = palette[nearest(data[i], data[i + 1], data[i + 2])];
+      data[i] = pc[0]; data[i + 1] = pc[1]; data[i + 2] = pc[2];
+    }
+    ctx.putImageData(imageData, 0, 0);
+    return;
+  }
 
   // Float buffer holds error-diffused RGB values at full precision.
   const buf = new Float32Array(w * h * 3);
