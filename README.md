@@ -1,5 +1,7 @@
 # Image Compressor & Resizer
 
+**→ [Try it live](https://johnsonhklhk.com/image-resizer/)**
+
 A browser-based image compressor and resizer in a single HTML file. Drop in a batch of PNG / JPG / WebP files, set a target width, and get resized + compressed versions back — with a before/after slider on every image.
 
 **Nothing is uploaded.** All decoding, resizing and compression happens locally in your browser via Canvas. No server, no backend, no telemetry.
@@ -22,7 +24,9 @@ A browser-based image compressor and resizer in a single HTML file. Drop in a ba
 
 ## Usage
 
-No build step, no dependencies to install.
+The hosted version lives at **<https://johnsonhklhk.com/image-resizer/>** — nothing to install, and since all processing is local your images never leave your machine even on the hosted copy.
+
+To run it yourself: no build step, no dependencies to install.
 
 ```bash
 git clone <your-repo-url>
@@ -37,7 +41,7 @@ python3 -m http.server 8000
 # then open http://localhost:8000
 ```
 
-It is a static file, so it can be dropped onto GitHub Pages, Netlify, Vercel or any static host as-is.
+It is a static file, so it can be dropped onto any static host as-is — which is exactly how the live version is deployed.
 
 ### Workflow
 
