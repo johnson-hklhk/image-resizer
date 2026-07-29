@@ -2,7 +2,7 @@
 
 **→ [Try it live](https://johnsonhklhk.com/image-resizer/)**
 
-A browser-based image compressor and resizer in a single HTML file. Drop in a batch of PNG / JPG / WebP files, set a target width, and get resized + compressed versions back — with a before/after slider on every image.
+A browser-based image compressor and resizer in a single HTML file. Drop in a batch of PNG / JPG / WebP files, set a max size, and get resized + compressed versions back — with a before/after slider on every image.
 
 **Nothing is uploaded.** All decoding, resizing and compression happens locally in your browser via Canvas. No server, no backend, no telemetry.
 
@@ -11,11 +11,11 @@ A browser-based image compressor and resizer in a single HTML file. Drop in a ba
 ## Features
 
 - **Batch processing** — load any number of images and process them in one pass
-- **Absolute target width** — every image is resized to the width you type, each deriving its own height from its own aspect ratio (it is *not* a scale factor copied from the first image)
-- **Quick presets** — 50% / 75% / 100% of the reference image, or fixed 1920w / 1280w / 1080w
-- **Keep ratio** and **Don't enlarge** toggles, the latter evaluated per image so a small file in the batch is never upscaled
+- **Max size box** — the width/height you type is an upper bound, not an exact size: every image is scaled down to fit inside that box, always keeping its aspect ratio. Both fields are hard caps, so mixed portrait/landscape batches all land within bounds. The height defaults to 1:1 with the width, which caps the longest side of every image regardless of orientation.
+- **Never enlarges** — an image already smaller than the box is passed through untouched; "max" is a ceiling, so there is no upscaling to opt out of
+- **Quick presets** — 50% / 75% / 100%, each applied per image against *its own* size, or fixed 1920 / 1280 / 1080 square boxes. A percent preset takes over from the max box while it's active; click it again to hand control back.
 - **Smart PNG compression** — PNG has no quality parameter, so it's compressed via median-cut colour quantization with Floyd–Steinberg dithering (the TinyPNG approach). Full resolution and sharp edges are preserved; per-pixel alpha is kept intact.
-- **Auto or manual quality** — auto uses 0.82 for JPG/WebP and a 256-colour palette for PNG; manual exposes a 0–100 slider (100 = lossless PNG)
+- **Quality slider** — a single 0–100 control (default 100) driving JPG/WebP encoder quality and the PNG palette size; 100 = lossless PNG
 - **Before/after compare** — draggable divider on every card, plus an expanded modal view
 - **Two downloads per image** — *Resized* (geometry only, quality 1) and *Compressed* (resized + compressed)
 - **Running total** of bytes saved across the whole batch
@@ -46,8 +46,8 @@ It is a static file, so it can be dropped onto any static host as-is — which i
 ### Workflow
 
 1. Drop images onto the dropzone (or click to pick them).
-2. The width/height fields are seeded from the **first** image loaded — that image is the reference for the percentage presets and for the previewed height.
-3. Adjust the target width, toggle **Keep ratio** / **Don't enlarge**, and optionally turn on **Manual** quality.
+2. The max width/height fields are seeded from the **first** image loaded — width from its width, height matching it 1:1. Nothing else is relative to that image; every image is measured against its own dimensions.
+3. Adjust the **max width / max height**, or pick a percentage preset, and set the **Quality** slider.
 4. Hit **Process all images**.
 5. Download per image from the card buttons, or **Download all** from the bottom action bar.
 
@@ -59,9 +59,9 @@ Downloaded files keep their original filenames — no `_resized` / `_compressed`
 
 | Input | Output format | Method |
 | --- | --- | --- |
-| JPG | JPEG | `canvas.toBlob` quality — `0.82` auto, or the slider value |
-| WebP | WebP | `canvas.toBlob` quality — `0.82` auto, or the slider value |
-| PNG | PNG | Colour quantization (median cut) + Floyd–Steinberg dithering, then DEFLATE. Auto = 256 colours; manual maps quality `0–99` to roughly `4–255` palette colours. Quality `100` skips quantization entirely and exports losslessly. |
+| JPG | JPEG | `canvas.toBlob` quality — the slider value / 100 |
+| WebP | WebP | `canvas.toBlob` quality — the slider value / 100 |
+| PNG | PNG | Colour quantization (median cut) + Floyd–Steinberg dithering, then DEFLATE. Quality `0–99` maps to roughly `4–255` palette colours; quality `100` skips quantization entirely and exports losslessly. |
 
 Fewer distinct colours means the PNG's DEFLATE stage compresses far better, while resolution and edge sharpness are untouched.
 
