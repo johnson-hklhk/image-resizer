@@ -218,12 +218,27 @@
     letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft);
   }
   .hud-input {
-    width: 110px; padding: 9px 10px; background: var(--paper); color: var(--ink);
+    width: 100%; padding: 9px 10px; background: var(--paper); color: var(--ink);
     border: var(--bw) solid var(--ink); border-radius: var(--radius);
-    font-family: var(--font-mono), monospace; font-size: 13px;
+    font-family: var(--font-mono), monospace; font-size: 13px; line-height: 1.2;
     font-variant-numeric: tabular-nums;
+    -moz-appearance: textfield; appearance: textfield; /* the spinners earn no space here */
   }
+  .hud-input::-webkit-outer-spin-button,
+  .hud-input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
   .hud-input:disabled { background: var(--paper-alt); color: var(--ink-soft); cursor: not-allowed; }
+
+  /* One ✕ at the end of the resize row, emptying both fields back to "no cap". Padding, border,
+     font and line-height mirror .hud-input so it lands at the same height without a hardcoded one. */
+  .hud-input__clear {
+    flex: 0 0 auto; width: 36px; padding: 9px 0;
+    background: var(--paper); color: var(--ink-soft);
+    border: var(--bw) solid var(--ink); border-radius: var(--radius);
+    font-family: var(--font-mono), monospace; font-size: 13px; line-height: 1.2;
+    cursor: pointer;
+  }
+  .hud-input__clear:hover:not(:disabled) { background: var(--ink); color: var(--paper); }
+  .hud-input__clear:disabled { background: var(--paper-alt); opacity: 0.5; cursor: not-allowed; }
 
   /* --- slider (as a HUD meter) ----------------------------- */
   .hud-slider {
@@ -274,6 +289,9 @@
     letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft);
   }
   .dropzone-active { border-style: solid; background: var(--paper-alt); }
+  /* Only separate the dropzone from the queue once the queue is actually on screen, so the
+     empty state keeps sitting straight under the section head. */
+  #workSection:not(.hidden) + #uploadSection { margin-top: 32px; }
 
   /* --- main column (clears the fixed panel ≥1024px) -------- */
   @media (min-width: 1024px) {
@@ -1704,24 +1722,14 @@ if(G>r)r=G;i++}while(i<y){A[i<<1]=0;A[(i<<1)+1]=0;i++}return r}return v}();
 
   <main id="mainArea" class="px-4 py-8 pb-32">
 
-    <!-- Upload area -->
-    <section id="uploadSection">
-      <div class="hud-section-head">
-        <span class="readout">[ INPUT_01 ]</span>
-        <h2 class="hud-title">Image Compressor / Resizer</h2>
-      </div>
-      <div id="dropzone" class="dropzone">
-        <svg class="dropzone__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-        </svg>
-        <p class="dropzone__title">Drop images here</p>
-        <p class="dropzone__sub">Click to select · PNG / JPG / WEBP · ≤30MB</p>
-        <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" class="hidden" multiple />
-      </div>
-    </section>
+    <!-- Section head — outside both sections so it stays put in either state -->
+    <div class="hud-section-head">
+      <span class="readout">[ INPUT_01 ]</span>
+      <h2 class="hud-title">Image Compressor / Resizer</h2>
+    </div>
 
     <!-- Work area (shown after upload) -->
-    <section id="workSection" class="hidden mt-8 space-y-6">
+    <section id="workSection" class="hidden space-y-6">
 
       <!-- Grid header -->
       <div class="flex items-center justify-between flex-wrap gap-3">
@@ -1741,21 +1749,37 @@ if(G>r)r=G;i++}while(i<y){A[i<<1]=0;A[(i<<1)+1]=0;i++}return r}return v}();
       </div>
     </section>
 
+    <!-- Upload area — stays on screen below the queue so more images can be dropped without
+         going through "Add more". Must remain workSection's immediate sibling: the gap between
+         the two is driven by an adjacent-sibling rule so it collapses on the empty state. -->
+    <section id="uploadSection">
+      <div id="dropzone" class="dropzone">
+        <svg class="dropzone__icon" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+        </svg>
+        <p class="dropzone__title">Drop images here</p>
+        <p class="dropzone__sub">Click to select · PNG / JPG / WEBP · ≤30MB</p>
+        <input type="file" id="fileInput" accept="image/png,image/jpeg,image/webp" class="hidden" multiple />
+      </div>
+    </section>
+
     <!-- Settings panel — always visible; floats on the left on large screens -->
     <div id="controlPanel" class="bg-white rounded-xl border border-gray-200 p-5 space-y-6 mt-8 lg:mt-0 lg:fixed lg:top-4 lg:left-4 lg:w-80 lg:max-h-[calc(100vh-2rem)] lg:overflow-y-auto lg:shadow-xl lg:z-10 lg:space-y-5">
 
         <!-- Resize settings -->
         <div>
           <h3 class="readout mb-3">Resize</h3>
-          <div class="flex flex-wrap items-end gap-3">
-            <div>
-              <label class="hud-label">Max width (px)</label>
-              <input id="widthInput" type="number" min="1" class="hud-input" />
+          <div class="flex items-end gap-3">
+            <div class="flex-1 min-w-0">
+              <label class="hud-label" for="widthInput">Max width (px)</label>
+              <input id="widthInput" type="number" min="1" placeholder="No limit" class="hud-input" />
             </div>
-            <div>
-              <label class="hud-label">Max height (px)</label>
-              <input id="heightInput" type="number" min="1" class="hud-input" />
+            <div class="flex-1 min-w-0">
+              <label class="hud-label" for="heightInput">Max height (px)</label>
+              <input id="heightInput" type="number" min="1" placeholder="No limit" class="hud-input" />
             </div>
+            <button type="button" id="clearSizeBtn" class="hud-input__clear"
+                    aria-label="Clear max width and height" title="Clear both">✕</button>
           </div>
           <p id="currentSizeLabel" class="hud-note mt-3"></p>
 
@@ -1821,7 +1845,6 @@ const MAX_DIMENSION = 8000; // safety cap to avoid canvas freezing on huge image
 
 const dropzone = document.getElementById('dropzone');
 const fileInput = document.getElementById('fileInput');
-const uploadSection = document.getElementById('uploadSection');
 const workSection = document.getElementById('workSection');
 const imageCountLabel = document.getElementById('imageCountLabel');
 const imageGrid = document.getElementById('imageGrid');
@@ -1833,6 +1856,7 @@ const heightInput = document.getElementById('heightInput');
 const currentSizeLabel = document.getElementById('currentSizeLabel');
 const qualitySlider = document.getElementById('qualitySlider');
 const qualityValue = document.getElementById('qualityValue');
+const clearSizeBtn = document.getElementById('clearSizeBtn');
 const processBtn = document.getElementById('processBtn');
 const controlPanel = document.getElementById('controlPanel');
 
@@ -1892,7 +1916,6 @@ function handleFiles(fileArray) {
           showToast(`Image ${file.name} is too large and was skipped`);
           return;
         }
-        const isFirstImage = images.length === 0;
         images.push({
           file,
           originalUrl: e.target.result,
@@ -1904,13 +1927,6 @@ function handleFiles(fileArray) {
           resizedBlob: null,
           resizedUrl: null,
         });
-        if (isFirstImage) {
-          // Seed the max box from the first image uploaded. The box defaults to 1:1
-          // (height = width), so out of the box it caps the longest side of every
-          // image regardless of orientation.
-          widthInput.value = img.width;
-          heightInput.value = img.width;
-        }
         renderGrid();
       };
       img.onerror = () => showToast(`Failed to read image: ${file.name}`);
@@ -1919,7 +1935,6 @@ function handleFiles(fileArray) {
     reader.readAsDataURL(file);
   });
 
-  uploadSection.classList.add('hidden');
   workSection.classList.remove('hidden');
 }
 
@@ -1937,7 +1952,6 @@ function clearAllImages() {
   images = [];
   renderGrid();
   workSection.classList.add('hidden');
-  uploadSection.classList.remove('hidden');
   showToast('Cleared all images');
 }
 
@@ -1952,17 +1966,39 @@ function refreshControls() {
   // A percent preset sizes each image off its own dimensions, so the max box plays no
   // part while one is active — grey the fields out rather than leave them looking live.
   widthInput.disabled = heightInput.disabled = !interactive || scalePercent !== null;
+  refreshClearSizeBtn();
   controlPanel.classList.toggle('opacity-60', !hasImages);
+}
+
+/* The ✕ follows the fields it clears: dead whenever they're locked, and dead when both are
+   already empty. Disabled rather than hidden so the row doesn't reflow as you type. */
+function refreshClearSizeBtn() {
+  const hasValue = widthInput.value !== '' || heightInput.value !== '';
+  clearSizeBtn.disabled = widthInput.disabled || !hasValue;
 }
 
 /* ===================== Grid rendering ===================== */
 // Both modes are measured per image against that image's own dimensions — nothing is
 // relative to the first image, and nothing is ever enlarged.
+/* The max box starts empty, and an empty field means "no cap on that axis". Infinity is the
+   honest value for that: it slots straight into the Math.min() that picks the scale factor and
+   drops out on its own, so an empty box needs no special case in the resize path. */
+function readMaxBox() {
+  const parse = (input) => input.value.trim() === '' ? Infinity : parseInt(input.value);
+  return { maxW: parse(widthInput), maxH: parse(heightInput) };
+}
+
 function updateSizeLabel() {
   if (!images.length) { currentSizeLabel.textContent = ''; return; }
-  currentSizeLabel.textContent = scalePercent !== null
-    ? `Every image scaled to ${scalePercent}% of its own size`
-    : `Every image fits inside ${widthInput.value || '?'} × ${heightInput.value || '?'} · ` +
+  if (scalePercent !== null) {
+    currentSizeLabel.textContent = `Every image scaled to ${scalePercent}% of its own size`;
+    return;
+  }
+  const { maxW, maxH } = readMaxBox();
+  const fmt = (v) => v === Infinity ? '∞' : (Number.isFinite(v) && v > 0 ? v : '?');
+  currentSizeLabel.textContent = maxW === Infinity && maxH === Infinity
+    ? 'No size cap — images keep their original dimensions, compress only'
+    : `Every image fits inside ${fmt(maxW)} × ${fmt(maxH)} · ` +
       `ratio kept, images already smaller are left as-is`;
 }
 
@@ -1989,9 +2025,10 @@ function renderGrid() {
       <p class="text-sm font-medium text-gray-700 truncate" title="${item.file.name}">${item.file.name}</p>
       ${visual}
       <p class="text-[11px] text-gray-400">${infoText}</p>
+      <p class="text-sm font-medium text-gray-700 truncate">Download</p>
       <div class="flex gap-2">
-        <button data-action="resized" data-idx="${idx}" class="card-btn flex-1 px-2 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed" ${item.resizedBlob ? '' : 'disabled'}>Download Resized</button>
-        <button data-action="compressed" data-idx="${idx}" class="card-btn flex-1 px-2 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed" ${item.resultBlob ? '' : 'disabled'}>Download Compressed</button>
+        <button data-action="resized" data-idx="${idx}" class="card-btn flex-1 px-2 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed" ${item.resizedBlob ? '' : 'disabled'}>Resized</button>
+        <button data-action="compressed" data-idx="${idx}" class="card-btn flex-1 px-2 py-1.5 text-xs rounded-lg border border-gray-200 text-gray-600 hover:bg-gray-50 disabled:opacity-40 disabled:cursor-not-allowed" ${item.resultBlob ? '' : 'disabled'}>Compressed</button>
       </div>
     `;
     imageGrid.appendChild(card);
@@ -2109,7 +2146,19 @@ function setScalePercent(percent) {
   input.addEventListener('input', () => {
     if (images.length === 0) return;
     updateSizeLabel();
+    refreshClearSizeBtn();
   });
+});
+
+/* Empties both fields at once, which reads as "no cap on either axis" — i.e. compress only.
+   Focus goes to the width field so the row is ready to retype rather than leaving focus parked
+   on a button that just went dead. */
+clearSizeBtn.addEventListener('click', () => {
+  widthInput.value = '';
+  heightInput.value = '';
+  updateSizeLabel();
+  refreshClearSizeBtn();
+  widthInput.focus();
 });
 
 /* Quick preset buttons. Percentages are per image (each scaled against its own size);
@@ -2203,11 +2252,15 @@ async function runProcessing(item, targetW, targetH) {
 // exceed it, and the percent presets top out at 100%.
 async function processAllImages() {
   if (images.length === 0) return;
-  const maxW = parseInt(widthInput.value);
-  const maxH = parseInt(heightInput.value);
-  if (scalePercent === null && (!maxW || maxW <= 0 || !maxH || maxH <= 0)) {
-    showToast('Please enter a valid max width and height first');
-    return;
+  // Blank is allowed and means "don't cap this axis"; anything actually typed still has to be a
+  // positive number, so a stray "0" or "-" is caught rather than silently treated as no cap.
+  const { maxW, maxH } = readMaxBox();
+  if (scalePercent === null) {
+    const invalid = (v) => v !== Infinity && !(v > 0);
+    if (invalid(maxW) || invalid(maxH)) {
+      showToast('Max width / height must be a positive number, or left empty for no limit');
+      return;
+    }
   }
 
   isProcessing = true;
