@@ -1,6 +1,6 @@
 # Image Compressor & Resizer
 
-**→ [Try it live](https://johnsonhklhk.com/image-resizer/)**
+**→ [Try it live](https://johnsonhklhk.com/image-resizer/)** · **[Source on GitHub](https://github.com/johnson-hklhk/image-resizer)**
 
 A browser-based image compressor and resizer in a single HTML file. Drop in a batch of PNG / JPG / WebP files, set a max size, and get resized + compressed versions back — with a before/after slider on every image.
 
@@ -29,7 +29,7 @@ The hosted version lives at **<https://johnsonhklhk.com/image-resizer/>** — no
 To run it yourself: no build step, no dependencies to install.
 
 ```bash
-git clone <your-repo-url>
+git clone https://github.com/johnson-hklhk/image-resizer.git
 cd image-resizer
 open index.html          # macOS — or just double-click the file
 ```
@@ -111,4 +111,6 @@ MIT.
 
 ---
 
-Built by Johnson Lee, Front-End Developer.
+Built by Johnson Lee, Front-End Developer — [@johnson-hklhk](https://github.com/johnson-hklhk)
+
+Issues and pull requests: <https://github.com/johnson-hklhk/image-resizer/issues>
