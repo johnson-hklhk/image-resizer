@@ -4,6 +4,15 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Image Compressor & Resizer</title>
+<!-- Google tag (gtag.js) -->
+<script async src="https://www.googletagmanager.com/gtag/js?id=G-XFEVS04ZCE"></script>
+<script>
+  window.dataLayer = window.dataLayer || [];
+  function gtag(){dataLayer.push(arguments);}
+  gtag('js', new Date());
+
+  gtag('config', 'G-XFEVS04ZCE');
+</script>
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='5' width='26' height='22' rx='4' fill='%23101010'/><circle cx='11' cy='12' r='2.6' fill='%23ffffff'/><path d='M4 27 L13 16 L17 20 L22 15 L28 22 L28 27 Z' fill='%23ffffff'/></svg>" />
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -178,6 +187,9 @@
   .btn--fill:hover { --cut: 20px; }
   .btn--fill:active { --cut: 8px; }
   .btn--fill:disabled { opacity: 0.4; cursor: not-allowed; }
+
+  /* Button labels come in two lengths — the short one takes over on thin view. */
+  .lbl-thin { display: none; }
   .btn--fill:focus-visible { outline: none; }
   .btn--fill:focus-visible::after {
     content: ''; position: absolute; inset: 7px; border: var(--bw) solid currentColor; pointer-events: none;
@@ -322,11 +334,22 @@
     border-radius: var(--radius-lg); box-shadow: var(--drop);
     font-family: var(--font-mono), monospace; color: var(--ink);
   }
-  #imageGrid > div > p:first-child {
-    font-family: var(--font-display), monospace; font-weight: 600;
-    font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink);
+  .card-head {
+    display: flex; align-items: center; justify-content: space-between; gap: 8px;
     padding-bottom: 8px; border-bottom: var(--bw) solid var(--ink);
   }
+  .card-head__name {
+    min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+    font-family: var(--font-display), monospace; font-weight: 600;
+    font-size: 12px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink);
+  }
+  /* Only earns its place on thin view, where the slot holding the Pending tag / spinner is gone. */
+  .card-status {
+    display: none; flex: none; padding: 2px 6px;
+    border: var(--bw) solid var(--ink); border-radius: var(--radius);
+    font-size: 9px; letter-spacing: 0.12em; text-transform: uppercase; white-space: nowrap;
+  }
+  .card-status--done { background: var(--ink); color: var(--paper); }
   #imageGrid .bg-gray-100 {
     background: repeating-linear-gradient(45deg,
       var(--paper-alt), var(--paper-alt) 10px, var(--slab-soft) 10px, var(--slab-soft) 20px);
@@ -458,6 +481,71 @@
     to { transform: translateY(0); opacity: 1; }
   }
   .toast-anim { animation: slideIn 0.3s ease-out; }
+
+  /* --- thin view (phone-width layout) ---------------------- */
+  @media (max-width: 767px) {
+    /* The action bar is welded to the bottom edge here, so the page has to end above it. */
+    :root { --actionbar-h: 104px; }
+    #mainArea { padding-bottom: calc(var(--actionbar-h) + 16px); }
+
+    /* Short labels only — the bar and the panel button have no width to spare. */
+    .lbl-wide { display: none; }
+    .lbl-thin { display: inline; }
+
+    /* Header strip and meta line share one row: with .hud-bar and .hud-meta__right
+       already hidden here, each is a single short label and a stacked pair wastes 38px. */
+    .hud-header { display: flex; align-items: stretch; border-bottom: var(--bw) solid var(--ink); }
+    .hud-header__row { flex: none; height: auto; }
+    .hud-meta {
+      flex: 1; min-width: 0; height: auto; border: 0;
+      padding-inline: 12px; font-size: 10px;
+    }
+
+    /* No room for a preview per card — the queue reads as a short scrolling list instead,
+       with the card header carrying the state the slot's tag used to. */
+    .compare-slot { display: none; }
+    .card-status { display: inline-block; }
+    #imageGrid {
+      max-height: 32vh; overflow-y: auto; overscroll-behavior: contain;
+      gap: 10px; padding-right: 4px;
+    }
+
+    /* Settings ride at the bottom of the viewport, right above the action bar, so the
+       controls stay reachable while the queue scrolls behind them. Capped and scrollable
+       because the panel is taller than the room a phone has to give it. */
+    #controlPanel {
+      position: sticky; bottom: calc(var(--actionbar-h) + 8px); z-index: 30;
+      max-height: 42vh; overflow-y: auto; overscroll-behavior: contain;
+      margin-top: 16px; padding: 14px;
+    }
+
+    /* Chrome that only repeats what the controls already say. */
+    .hud-section-head, .callout { display: none; }
+
+    /* Tighter rhythm everywhere — every saved pixel goes to the queue. */
+    #mainArea { padding-top: 16px; padding-inline: 12px; }
+    #workSection > * + * { margin-top: 12px; }
+    #imageGrid > div { padding: 10px; }
+    #imageGrid > div > * + * { margin-top: 8px; }
+    #workSection:not(.hidden) + #uploadSection { margin-top: 12px; }
+    .dropzone { padding: 20px 16px; gap: 8px; }
+
+    /* Percent presets stay; fixed-width ones would only overflow the row. */
+    .quick-btn[data-width] { display: none; }
+
+    /* Full-bleed bottom bar: no gap, no rounding, only the top edge is drawn. */
+    .hud-actionbar {
+      left: 0; right: 0; bottom: 0;
+      padding: 10px var(--gutter) calc(10px + env(safe-area-inset-bottom, 0px));
+      border-width: var(--bw) 0 0; border-radius: 0; box-shadow: none;
+    }
+    .hud-actionbar .hud-actiontotal { flex: 1 0 100%; }
+    .hud-actionbar .btn,
+    .hud-actionbar .btn--fill { flex: 1 1 0; min-width: 0; padding-inline: 10px; }
+    /* The leading dash costs 24px with the gap — the label needs it more. */
+    .btn::before,
+    .btn--fill::before { display: none; }
+  }
 
   /* --- reduced motion -------------------------------------- */
   @media (prefers-reduced-motion: reduce) {
@@ -1744,8 +1832,8 @@ if(G>r)r=G;i++}while(i<y){A[i<<1]=0;A[(i<<1)+1]=0;i++}return r}return v}();
       <div class="hud-actionbar">
         <span id="totalSaved" class="hud-actiontotal">TOTAL —</span>
         <button id="clearBtn" class="btn">Clear</button>
-        <button id="addMoreBtn" class="btn">Add more</button>
-        <button id="downloadAllImagesBtn" class="btn--fill" style="width:auto">Download all</button>
+        <button id="addMoreBtn" class="btn"><span class="lbl-wide">Add more</span><span class="lbl-thin">Add</span></button>
+        <button id="downloadAllImagesBtn" class="btn--fill" style="width:auto"><span class="lbl-wide">Download all</span><span class="lbl-thin">Save all</span></button>
       </div>
     </section>
 
@@ -1811,7 +1899,7 @@ if(G>r)r=G;i++}while(i<y){A[i<<1]=0;A[(i<<1)+1]=0;i++}return r}return v}();
 
         <!-- Process button -->
         <div>
-          <button id="processBtn" class="btn--fill">Process all images</button>
+          <button id="processBtn" class="btn--fill"><span class="lbl-wide">Process all images</span><span class="lbl-thin">Process</span></button>
         </div>
     </div>
   </main>
@@ -2017,12 +2105,22 @@ function renderGrid() {
         ? compareMarkup(idx, item.originalUrl, item.resultUrl, true)
         : `<div class="compare-slot"><img class="compare-slot__img" src="${item.originalUrl}" /><span class="compare-slot__tag">Pending</span></div>`;
 
+    // Thin view drops the preview slot, so the card header carries the state instead.
+    const status = isProcessing
+      ? { label: 'Processing', mod: '' }
+      : item.resultUrl
+        ? { label: 'Done', mod: ' card-status--done' }
+        : { label: 'Pending', mod: '' };
+
     const infoText = item.resultBlob
       ? `${item.width}×${item.height} ${formatBytes(item.file.size)} → ${item.processedWidth}×${item.processedHeight} ${formatBytes(item.resultBlob.size)} · -${getSavedPercent(item)}%`
       : `${item.width} × ${item.height} · ${formatBytes(item.file.size)}`;
 
     card.innerHTML = `
-      <p class="text-sm font-medium text-gray-700 truncate" title="${item.file.name}">${item.file.name}</p>
+      <div class="card-head">
+        <p class="card-head__name" title="${item.file.name}">${item.file.name}</p>
+        <span class="card-status${status.mod}">${status.label}</span>
+      </div>
       ${visual}
       <p class="text-[11px] text-gray-400">${infoText}</p>
       <p class="text-sm font-medium text-gray-700 truncate">Download</p>
