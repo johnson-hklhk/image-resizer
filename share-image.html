@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Share Image — Image Compressor &amp; Resizer</title>
+<!--
+  1280 × 720 share/OG card for the minisite.
+  Pure layout, no JS: open it and the board is the page, 1:1.
+  Render to PNG with:
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" \
+      --headless --disable-gpu --hide-scrollbars --force-color-profile=srgb \
+      --virtual-time-budget=6000 --window-size=1280,720 \
+      --screenshot=share.png share-image.html
+  Skin is ported from index.html: same tokens, same header strip, same readouts.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kode+Mono:wght@400;500;600;700&family=Roboto+Mono:wght@400;500&family=Libre+Barcode+128+Text&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --ink: #101010;   --paper: #ffffff;
+    --ink-soft: #5c5c5c;   --paper-alt: #f2f2f2;
+    --ink-faint: #9b9b9b;  --slab: #b5b5b5;   --slab-soft: #d8d8d8;
+
+    --shade: rgba(16,16,16,0.22);
+    --drop: 5px 5px 0 var(--shade);
+
+    --radius: 4px;   --radius-lg: 10px;   --bw: 2px;
+    --gutter: 44px;
+    --header-h: 52px;  --meta-h: 44px;
+
+    --font-display: 'Kode Mono';
+    --font-mono: 'Roboto Mono';
+    --font-barcode: 'Libre Barcode 128 Text';
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  html, body {
+    width: 1280px; height: 720px; overflow: hidden;
+    background: var(--paper); color: var(--ink);
+    font-family: var(--font-mono), ui-monospace, monospace;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .board { width: 1280px; height: 720px; display: flex; flex-direction: column; }
+
+  /* --- header strip (verbatim from the site) ---------------- */
+  .hud-header__row { display: flex; align-items: stretch; gap: 10px; height: var(--header-h); }
+  .hud-tab {
+    display: grid; place-items: center; padding: 0 30px;
+    background: var(--ink); color: var(--paper);
+    font-family: var(--font-display), monospace; font-weight: 600;
+    font-size: 14px; letter-spacing: 0.08em; text-transform: uppercase;
+  }
+  .hud-wire { flex: 1; align-self: center; height: var(--bw); background: var(--ink); }
+  .hud-bar {
+    display: flex; align-items: center; gap: 22px;
+    padding: 0 var(--gutter); background: var(--ink); color: var(--paper);
+    font-size: 13px; letter-spacing: 0.12em; text-transform: uppercase;
+  }
+  .hud-status { display: inline-flex; align-items: center; gap: 9px; color: var(--slab); }
+  .hud-status::before { content: ''; width: 7px; height: 7px; background: currentColor; }
+  .hud-meta {
+    display: flex; align-items: center; justify-content: space-between;
+    height: var(--meta-h); padding: 0 var(--gutter);
+    border-top: var(--bw) solid var(--ink); border-bottom: var(--bw) solid var(--ink);
+    font-size: 12px; font-weight: 500; letter-spacing: 0.14em; text-transform: uppercase;
+  }
+  .hud-meta__right { color: var(--ink-faint); }
+
+  /* --- body grid -------------------------------------------- */
+  .stage {
+    flex: 1; display: grid; grid-template-columns: 1fr 486px;
+    gap: 46px; padding: 40px var(--gutter) 34px;
+  }
+  .col { display: flex; flex-direction: column; }
+
+  .readout {
+    display: inline-flex; align-items: center; gap: 8px; width: max-content;
+    padding: 4px 11px; border: var(--bw) solid var(--ink); border-radius: var(--radius);
+    font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; white-space: nowrap;
+  }
+  .readout--fill { background: var(--ink); color: var(--paper); }
+
+  .hud-title {
+    margin-top: 22px;
+    font-family: var(--font-display), monospace; font-weight: 600;
+    font-size: 66px; line-height: 1.0;
+    letter-spacing: 0.01em; text-transform: uppercase;
+  }
+  .hud-title span { color: var(--slab); }
+
+  .rule { height: var(--bw); background: var(--ink); margin: 26px 0 20px; width: 100%; }
+
+  .lede {
+    font-size: 15px; line-height: 1.62; color: var(--ink-soft);
+    max-width: 52ch;
+  }
+  .lede b { color: var(--ink); font-weight: 500; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 9px; margin-top: 24px; }
+  .chips .readout { font-size: 10px; letter-spacing: 0.16em; padding: 4px 10px; }
+
+  .foot { margin-top: auto; display: flex; align-items: flex-end; gap: 18px; }
+  .url {
+    display: inline-flex; align-items: center; gap: 12px;
+    padding: 11px 20px; background: var(--ink); color: var(--paper);
+    font-size: 14px; letter-spacing: 0.1em;
+    clip-path: polygon(12px 0, 100% 0, 100% calc(100% - 12px), calc(100% - 12px) 100%, 0 100%, 0 12px);
+  }
+  .url::before { content: ''; flex: none; width: 16px; height: var(--bw); background: currentColor; }
+  .barcode {
+    font-family: var(--font-barcode), monospace; font-size: 38px; line-height: 1;
+    color: var(--slab-soft); letter-spacing: 0.02em; padding-bottom: 2px;
+  }
+
+  /* --- right column: the compare card ----------------------- */
+  .card {
+    position: relative; height: 348px; overflow: hidden;
+    border: var(--bw) solid var(--ink); border-radius: var(--radius-lg);
+    box-shadow: var(--drop); background: var(--paper);
+  }
+
+  /* one scene, drawn twice — the right copy is the "quantized" pass */
+  .scene { position: absolute; inset: 0; }
+  .sky   { position: absolute; inset: 0; background: linear-gradient(180deg, #ffffff 0%, #ededed 46%, #d4d4d4 100%); }
+  .sun   { position: absolute; top: 46px; left: 58px; width: 66px; height: 66px; border-radius: 50%; background: var(--ink); }
+  .ridge-back {
+    position: absolute; inset: 0; background: var(--ink-faint);
+    clip-path: polygon(0% 76%, 17% 50%, 31% 65%, 51% 38%, 70% 61%, 87% 46%, 100% 58%, 100% 100%, 0 100%);
+  }
+  .ridge-mid {
+    position: absolute; inset: 0; background: var(--ink-soft);
+    clip-path: polygon(0% 85%, 12% 66%, 26% 79%, 44% 58%, 60% 76%, 78% 62%, 100% 78%, 100% 100%, 0 100%);
+  }
+  .ridge-front {
+    position: absolute; inset: 0; background: var(--ink);
+    clip-path: polygon(0% 94%, 15% 77%, 31% 89%, 47% 70%, 65% 87%, 81% 75%, 100% 90%, 100% 100%, 0 100%);
+  }
+
+  .half-comp { position: absolute; inset: 0; clip-path: inset(0 0 0 50%); }
+  /* banded sky + collapsed ridge palette = fewer levels */
+  .half-comp .sky {
+    background: linear-gradient(180deg,
+      #ffffff 0 62px, #f4f4f4 62px 124px, #e6e6e6 124px 186px,
+      #dbdbdb 186px 248px, #d0d0d0 248px 348px);
+  }
+  /* palette collapsed to two mid tones — the point of quantization */
+  .half-comp .ridge-back { background: var(--slab); }
+  .half-comp .ridge-mid  { background: var(--slab); }
+  /* ordered dither: the Floyd-Steinberg pass, exaggerated so it survives
+     the downscale a share card gets in a timeline */
+  .dither {
+    position: absolute; inset: 0; opacity: 0.28; mix-blend-mode: multiply;
+    background-image:
+      radial-gradient(var(--ink) 1.1px, transparent 1.3px),
+      radial-gradient(var(--ink) 1.1px, transparent 1.3px);
+    background-size: 6px 6px, 6px 6px;
+    background-position: 0 0, 3px 3px;
+  }
+  /* 8px block grid — the other half of "this file got smaller" */
+  .blocks {
+    position: absolute; inset: 0; opacity: 0.1; mix-blend-mode: multiply;
+    background-image:
+      linear-gradient(90deg, var(--ink) 1px, transparent 1px),
+      linear-gradient(180deg, var(--ink) 1px, transparent 1px);
+    background-size: 16px 16px, 16px 16px;
+  }
+
+  .divider { position: absolute; top: 0; bottom: 0; left: 50%; width: var(--bw); background: var(--ink); transform: translateX(-1px); }
+  .knob {
+    position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+    width: 38px; height: 38px; border-radius: 50%;
+    background: var(--paper); border: var(--bw) solid var(--ink);
+    display: grid; place-items: center;
+    font-size: 11px; letter-spacing: 0.02em; font-weight: 500;
+  }
+
+  .tag {
+    position: absolute; top: 14px;
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 5px 10px; font-size: 10px; letter-spacing: 0.14em; text-transform: uppercase;
+    background: var(--paper); border: var(--bw) solid var(--ink); border-radius: var(--radius);
+  }
+  .tag--a { left: 14px; }
+  .tag--b { right: 14px; background: var(--ink); color: var(--paper); }
+
+  /* --- stat block under the card ---------------------------- */
+  .stats { margin-top: 26px; display: flex; align-items: stretch; gap: 16px; }
+  .stat-big {
+    display: flex; flex-direction: column; justify-content: center; gap: 2px;
+    padding: 14px 24px 16px; background: var(--ink); color: var(--paper);
+    clip-path: polygon(14px 0, 100% 0, 100% calc(100% - 14px), calc(100% - 14px) 100%, 0 100%, 0 14px);
+  }
+  .stat-big strong {
+    font-family: var(--font-display), monospace; font-weight: 700;
+    font-size: 54px; line-height: 1; letter-spacing: 0.01em;
+  }
+  .stat-big span { font-size: 10px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--slab); }
+
+  .stat-list {
+    flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 7px;
+    padding-left: 18px; border-left: var(--bw) solid var(--ink);
+    font-size: 11px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ink-soft);
+  }
+  .stat-list b { color: var(--ink); font-weight: 500; }
+
+  /* hatch tick, same 45° stripe the site uses on fills */
+  .hatch {
+    height: 14px; margin-top: auto;
+    background: repeating-linear-gradient(45deg,
+      var(--ink) 0 2px, transparent 2px 7px);
+    opacity: 0.85;
+  }
+</style>
+</head>
+<body>
+  <div class="board">
+
+    <header>
+      <div class="hud-header__row">
+        <span class="hud-tab">IMAGE_TOOL</span>
+        <span class="hud-wire"></span>
+        <div class="hud-bar">
+          <span class="hud-status">ONLINE</span>
+          <span>LOCAL / NO-UPLOAD</span>
+        </div>
+      </div>
+      <div class="hud-meta">
+        <span>COMPRESS · RESIZE</span>
+        <span class="hud-meta__right">JOHNSON LEE / FRONT-END DEVELOPER</span>
+      </div>
+    </header>
+
+    <div class="stage">
+
+      <!-- left: the pitch -->
+      <div class="col">
+        <span class="readout">[ SHARE_01 ]</span>
+
+        <h1 class="hud-title">Image<br>Compressor<br><span>/</span> Resizer</h1>
+
+        <div class="rule"></div>
+
+        <p class="lede">
+          Batch resize and compress PNG / JPG / WebP in the browser.
+          <b>Nothing is uploaded</b> — every decode, resize and encode runs
+          locally on Canvas. One HTML file, no backend, no telemetry.
+        </p>
+
+        <div class="chips">
+          <span class="readout">Batch</span>
+          <span class="readout">PNG Quantize</span>
+          <span class="readout">Before / After</span>
+          <span class="readout">Quality 0–100</span>
+          <span class="readout readout--fill">100% Local</span>
+        </div>
+
+        <div class="foot">
+          <span class="url">johnsonhklhk.com/image-resizer</span>
+          <span class="barcode">IMAGE-RESIZER</span>
+        </div>
+      </div>
+
+      <!-- right: the demo -->
+      <div class="col">
+        <div class="card">
+          <div class="scene">
+            <div class="sky"></div>
+            <div class="sun"></div>
+            <div class="ridge-back"></div>
+            <div class="ridge-mid"></div>
+            <div class="ridge-front"></div>
+          </div>
+
+          <div class="half-comp">
+            <div class="scene">
+              <div class="sky"></div>
+              <div class="sun"></div>
+              <div class="ridge-back"></div>
+              <div class="ridge-mid"></div>
+              <div class="ridge-front"></div>
+            </div>
+            <div class="dither"></div>
+            <div class="blocks"></div>
+          </div>
+
+          <div class="divider"></div>
+          <div class="knob">&lt;&nbsp;&gt;</div>
+
+          <span class="tag tag--a">Original · 4.8 MB</span>
+          <span class="tag tag--b">Compressed · 612 KB</span>
+        </div>
+
+        <div class="stats">
+          <div class="stat-big">
+            <strong>−87%</strong>
+            <span>Size saved</span>
+          </div>
+          <div class="stat-list">
+            <span><b>Max-box</b> resize, never upscales</span>
+            <span><b>Floyd–Steinberg</b> PNG dither</span>
+            <span>Alpha preserved · <b>no server</b></span>
+          </div>
+        </div>
+
+        <div class="hatch"></div>
+      </div>
+
+    </div>
+  </div>
+</body>
+</html>
